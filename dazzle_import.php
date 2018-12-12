@@ -51,8 +51,8 @@ function dazzle_imported_menu_link_callback() {
 			$errors[]="File extension incorrect.  Please choose a .TXT file.";
 		}
 
-		if($file_size > 20971520){
-			$errors[]='File size must be less than 20 MB.';
+		if($file_size > 2097152){
+			$errors[]='File size must be less than 2 MB.';
 		}
 
 		if(empty($errors)==true){
@@ -85,7 +85,8 @@ function dazzle_imported_menu_link_callback() {
 			foreach ($array_file as $line)
 			{
 				$arr_line = explode("\t", $line);
-				$order_id = $arr_line[15]; // Reference ID is the 16th column of the exported file
+				// $order_id = $arr_line[15];
+			  	$order_id = preg_replace('/\D/', '', $arr_line[15]); // Reference ID is the 16th column of the exported file.  preg_replace is making sure that we end up with 0-9 only.
 				if (is_numeric($order_id))
 				{
 					if ($order = wc_get_order($order_id))

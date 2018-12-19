@@ -63,18 +63,24 @@ function dazzle_imported_menu_link_callback() {
 			$count = 0;
 
 			// Sanitize uploaded file -- this might not be necessary
-			$str=str_replace("'","",$str);
-			$str=str_replace(",","",$str);
-			$str=str_replace("&","AND",$str);
-			$str=str_replace("Outbound/Return","OutboundOrReturn",$str);
-			$str=str_replace("/","-",$str);
-			$str=str_replace("Postage ($)","Postage",$str);
-			$str=str_replace("Balance ($)","Balance",$str);
-			$str=str_replace("Declared Value ($)","DeclaredValue",$str);
-			$str=str_replace("$","USD",$str);
-			$str=str_replace("Weight (oz)","WeightOunces",$str);
-			$str=str_replace("Reference ID","ReferenceID",$str);
-			$str=str_replace("Group Code","GroupCode",$str);
+			$validation_data = array(
+				"'" => "",
+				"," => "",
+				"&" => "AND",
+				"Outbound/Return" => "OutboundOrReturn",
+				"/" => "-",
+				"Postage ($)" => "Postage",
+				"Balance ($)" => "Balance",
+				"Declared Value ($)" => "DeclaredValue",
+				"$" => "USD",
+				"Weight (oz)" => "WeightOunces",
+				"Reference ID" => "ReferenceID",
+				"Group Code" => "GroupCode",
+			);
+		  	foreach ($validation_data as $find => $replace)
+			{	
+				$str = str_replace($find, $replace, $str);
+			}
 
 			/*
 			* User should have uploaded a tab-delimited text file exported by DAZzle

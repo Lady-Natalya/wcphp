@@ -1,5 +1,5 @@
 /* WooCommerce DAZzle Address Export script
-*  Version 0.0.0
+*  Version 0.0.1
 *  Export lots of addresses from WooCommerce orders into a .txt file DAZzle can use to import addresses quickly
 *
 *  This script can be copied into functions.php or in a script managing plugin
@@ -114,5 +114,4 @@ function dazzle_address_export() {
 		readfile($out);
 	  	die();
 	}
-	exit;
 }

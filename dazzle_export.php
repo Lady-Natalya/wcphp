@@ -1,5 +1,5 @@
 /* WooCommerce DAZzle Address Export script
-*  Version 0.0.1
+*  Version 0.0.2
 *  Export lots of addresses from WooCommerce orders into a .txt file DAZzle can use to import addresses quickly
 *
 *  This script can be copied into functions.php or in a script managing plugin
@@ -22,6 +22,7 @@ function cleanData(&$str)
 {
 	$str = preg_replace("/\t/", "\\t", $str);
 	$str = preg_replace("/\r?\n/", "\\n", $str);
+  	
 	if(strstr($str, '"')) $str = '"' . str_replace('"', '""', $str) . '"';
 }
 
@@ -75,7 +76,7 @@ function dazzle_address_export() {
 				foreach( $order_ids as $order_id ) {
 				  	// This tells WC that the post id was actually referring to an order
 					$order = new WC_Order( $order_id );
-					$addressdata[] = array("FirstName" => strtoupper($order->shipping_first_name), "LastName" => strtoupper($order->shipping_last_name), "Company" => $order->shipping_company, "Address1" => $order->shipping_address_1, "Address2" => $order->shipping_address_2, "Address3" => $order->shipping_address_3, "City" => $order->shipping_city, "State" => $order->shipping_state, "PostalCode" => $order->shipping_postcode, "Country" => $order->shipping_country, "EMail" => $order->billing_email, "ReturnCode" => "", "CarrierRoute" => "", "DeliveryPoint" => "");
+					$addressdata[] = array("FirstName" => strtoupper($order->shipping_first_name), "LastName" => strtoupper($order->shipping_last_name), "Company" => $order->shipping_company, "Address1" => preg_replace('[\.]', NULL, $order->shipping_address_1), "Address2" => $order->shipping_address_2, "Address3" => $order->shipping_address_3, "City" => $order->shipping_city, "State" => $order->shipping_state, "PostalCode" => $order->shipping_postcode, "Country" => $order->shipping_country, /*"EMail" => $order->billing_email,*/ "ReturnCode" => "", "CarrierRoute" => "", "DeliveryPoint" => "");
 				  	// Exported counter might actually be useless.
 					$exported++;
 				}

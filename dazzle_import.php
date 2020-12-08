@@ -1,3 +1,4 @@
+// V 1.0.1
 // Use this to mark orders as complete in bulk by exporting your postage log
 // Be sure to put the WooCommerce order number into the Reference ID box when printing each label
 // Put this in a code snippet or into functions.php
@@ -92,25 +93,56 @@ function dazzle_imported_menu_link_callback() {
 			{
 				$arr_line = explode("\t", $line);
 				// $order_id = $arr_line[15];
-			  	$order_id = preg_replace('/\D/', '', $arr_line[15]); // Reference ID is the 16th column of the exported file.  preg_replace is making sure that we end up with 0-9 only.
-				if (is_numeric($order_id))
+			  	$order_str = preg_replace('/[^0-9,\+]/', '', $arr_line[15]); // Reference ID is the 16th column of the exported file.  preg_replace is making sure that we end up with 0-9 or + only. Maximum length is 25 characters.
+				$arr_order = explode("+", $order_str);
+				foreach ($arr_order as $order_id)
 				{
-					if ($order = wc_get_order($order_id))
+					if (is_numeric($order_id))
 					{
-						if ($order->get_status() == 'completed')
+						if ($order = wc_get_order($order_id))
 						{
-							echo '<span>Order #' , $order_id , ' had already been marked as COMPLETED</span><br />';
+							update_post_meta($order_id, 'usps_tracking_number', $arr_line[12]);
+							//echo $order_id, ' ';
+						}
+					}
+				}
+			}
+		  	
+			$completed_count = 0;
+			
+			foreach ($array_file as $line)
+			{
+				$arr_line = explode("\t", $line);
+				// $order_id = $arr_line[15];
+			  	$order_str = preg_replace('/[^0-9,\+]/', '', $arr_line[15]);
+				$arr_order = explode("+", $order_str);
+				foreach ($arr_order as $order_id)
+				{
+					if (is_numeric($order_id))
+					{
+						if ($order = wc_get_order($order_id))
+						{
+							$link = '<a href="'. admin_url( 'post.php?post=' . absint( $order->get_id() ) . '&action=edit' ) .'" >' . $order_id . '</a>';
+							
+							$usps = get_post_meta( $order_id, 'usps_tracking_number', true);
+							if ($order->get_status() == 'completed')
+							{
+								echo '<span style="background-color: #FFFFDD;">Order #' , $link , ' has had its USPS tracking number set to ', $usps ,' and had already been marked as COMPLETED</span><br />';
+							}
+							else
+							{					  
+								$order->set_status('completed');
+								$order->save();
+
+								echo '<span>Order #' , $link , ' has had its USPS tracking number set to ', $usps ,' and has had its status changed to: ' , strtoupper($order->get_status( )) , '</span><br />';
+								$completed_count += 1;
+							}
+							$count += 1;
 						}
 						else
 						{
-							$order->update_status('completed');
-							echo '<span>Order #' , $order_id , ' has had its status changed to: ' , strtoupper($order->get_status( )) , '</span><br />';
+							echo '<span style="background-color: #FFBBBB;">Order #' , $order_id , ' DOES NOT EXIST</span><br />'; // Maybe they typed the reference ID into DAZzle wrong?
 						}
-						$count += 1;
-					}
-					else
-					{
-						echo '<span style="background-color: #FFBBBB;">Order #' , $order_id , ' DOES NOT EXIST</span><br />'; // Maybe they typed the reference ID into DAZzle wrong?
 					}
 				}
 			}
@@ -119,6 +151,7 @@ function dazzle_imported_menu_link_callback() {
 				<li>File type: ' . $_FILES[upload][type] . '</li>
 			</ul>
 			<br />Number of Orders Processed:  ' , $count;
+		  	echo '<br />Number of Orders Marked Complete:  ', $completed_count;
 		}else{
 			print_r($errors);
 		}

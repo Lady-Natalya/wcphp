@@ -1,5 +1,5 @@
 /* WooCommerce DAZzle Address Export script
-*  Version 0.0.2
+*  Version 1.0.0
 *  Export lots of addresses from WooCommerce orders into a .txt file DAZzle can use to import addresses quickly
 *
 *  This script can be copied into functions.php or in a script managing plugin
@@ -15,7 +15,6 @@
 *  Make sure to delete the old ADDRESSES.txt so that you don't get a (1) added to the filename so DAZzle will remember the field mapping
 *
 *  I hope this script helps you save time with WooCommerce and DAZzle */
-
 
 // cleanData will format the data to be compatible with .csv file format
 function cleanData(&$str)
@@ -54,11 +53,12 @@ function dazzle_address_export() {
 	if($post_type == 'shop_order')
 	{
 		$wp_list_table = _get_list_table('WP_Posts_List_Table');
-		// See if it was our new action: dazzleexport
+	  
+		// See if it was the new dazzleexport action
 		$action = $wp_list_table->current_action();
-		$allowed_actions = array("dazzleexport");
-		if(!in_array($action, $allowed_actions)) return;
-	  	// Create an array of the orders that were selected.  WC orders are posts in the WP database.
+		if(strcasecmp($action, "dazzleexport") != 0) return;
+	  
+	  	// Create an array of the orders that were selected.  WC orders are posts in the WP db.
 		if(isset($_REQUEST['post'])) {
 			$order_ids = array_map('intval', $_REQUEST['post']);
 		}
@@ -70,15 +70,29 @@ function dazzle_address_export() {
 		switch($action) {
 			case 'dazzleexport':
 				// Setup to bulk export.
-				$exported = 0;
 				$addressdata = array();
+			
 				// Write addresses from each selected order to $addressdata array
 				foreach( $order_ids as $order_id ) {
 				  	// This tells WC that the post id was actually referring to an order
 					$order = new WC_Order( $order_id );
-					$addressdata[] = array("FirstName" => strtoupper($order->shipping_first_name), "LastName" => strtoupper($order->shipping_last_name), "Company" => $order->shipping_company, "Address1" => preg_replace('[\.]', NULL, $order->shipping_address_1), "Address2" => $order->shipping_address_2, "Address3" => $order->shipping_address_3, "City" => $order->shipping_city, "State" => $order->shipping_state, "PostalCode" => $order->shipping_postcode, "Country" => $order->shipping_country, /*"EMail" => $order->billing_email,*/ "ReturnCode" => "", "CarrierRoute" => "", "DeliveryPoint" => "");
-				  	// Exported counter might actually be useless.
-					$exported++;
+					$addressdata[] = array(
+						"FirstName" => strtoupper($order->shipping_first_name),
+						"LastName" => strtoupper($order->shipping_last_name),
+						"Company" => $order->shipping_company,
+						"Address1" => preg_replace('[\.]', NULL, $order->shipping_address_1),
+						"Address2" => $order->shipping_address_2,
+						"Address3" => $order->shipping_address_3,
+						"City" => $order->shipping_city,
+						"State" => $order->shipping_state,
+						"PostalCode" => $order->shipping_postcode,
+						"Country" => $order->shipping_country,
+						/*"EMail" => $order->billing_email,*/
+					  	/* The following items need to be present, but can be left empty. */
+						"ReturnCode" => "",
+						"CarrierRoute" => "",
+						"DeliveryPoint" => ""
+					);
 				}
 			break;
 		}
@@ -88,22 +102,16 @@ function dazzle_address_export() {
 		$flag = false;
 	  	$row_id=1;
 		foreach($addressdata as $row) {
-
-		  
-
-
-		if(!$flag) {
-			// display field/column names as first row
-
-			fputcsv($out, array_keys($row), chr(9), '"');	
-			$flag = true;
-		}
-		array_walk($row, __NAMESPACE__ . '\cleanData');
-		fputcsv($out, array_values($row), chr(9), '"');
+			if(!$flag) {
+				// display field/column names as first row
+				fputcsv($out, array_keys($row), chr(9), '"');	
+				$flag = true;
+			}
+			array_walk($row, __NAMESPACE__ . '\cleanData');
+			fputcsv($out, array_values($row), chr(9), '"');
 		}
 		// Send the newly created file to the user.
 		fclose($out);
-
 
 		// Force the download
 		header('Content-Disposition: attachment; filename="ADDRESSES.txt" . basename($out) . ""');

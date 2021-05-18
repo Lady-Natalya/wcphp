@@ -1,5 +1,5 @@
 /*
-* V 2.0.0
+* V 2.0.1
 * Use this to mark orders as complete in bulk by exporting your postage log
 * Be sure to put the WooCommerce order number into the Reference ID box when printing each label
 * Put this in a code snippet or into functions.php
@@ -109,7 +109,7 @@ function dazzle_ws_import_menu_link_callback() {
 			$file = $_FILES['upload']['tmp_name'];
 			
 	  		?>
-	  		<span>Loaded File ', $file_name, '</span><br />
+	  		<span>Loaded File <?php echo $file_name;?></span><br />
 	  		<br />
 	  		<?php
 		  	
@@ -181,8 +181,7 @@ function dazzle_ws_import_menu_link_callback() {
 
 									// We only want to mark an order completed once.  If it was already completed we'll leave this note.
 								  	$status = $order->get_status();
-									if ($status == 'completed' || 'refunded')
-									{
+									if (($status == 'completed') || ($status == 'refunded')) {
 										echo '<span class="tracking bg-completed">Order #' , $link , ' has had its USPS tracking number set to ', $usps ,' and had already been marked as ' , strtoupper($status) , '</span><br />';
 									}
 									else
@@ -251,7 +250,7 @@ function dazzle_ws_import_menu_link_callback() {
 								  	$link = format_order_link($order_id);
 									update_post_meta($order_id, 'ups_tracking_number', (string)$tracking_str);
 								  	$status = $order->get_status();
-									if ($status == 'completed' || 'refunded') {
+									if (($status == 'completed') || ($status == 'refunded')) {
 										echo '<span class="tracking bg-completed">Order #' . $link . ' has had its UPS tracking set to ' . $tracking_link_str . ' and had already been marked as ' , strtoupper($status) , '</span><br />';
 									} else {
 										$order->set_status('completed');

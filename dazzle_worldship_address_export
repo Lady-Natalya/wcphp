@@ -1,5 +1,5 @@
 /* WooCommerce DAZzle and WorldShip Address Export script
-*  Version 2.0.0
+*  Version 2.0.1
 *
 *  Export lots of addresses from WooCommerce orders into a .txt file DAZzle can use to import addresses quickly
 *  As of 2.0.0 addresses can also be exported as a .csv for UPS WorldShip
@@ -52,7 +52,6 @@ function cleanData(&$str)
 
 // Add DAZzle Bulk Export Addresses to the orders dropdown
 add_action('admin_footer-edit.php', 'dazzle_bulk_admin_footer');
-// insert it in the dropdown
 function dazzle_bulk_admin_footer() {
 
 	global $post_type;
@@ -60,8 +59,7 @@ function dazzle_bulk_admin_footer() {
 		?>
 		<script type="text/javascript">
 			jQuery(document).ready(function() {
-				jQuery('<option>').val('dazzleexport').text('<?php _e('Export Addresses for DAZzle')?>').appendTo("select[name='action']");
-				
+				jQuery('<option>').val('dazzleexport').text('<?php _e('Export Addresses for DAZzle')?>').appendTo("select[name='action']");	
 			});
 		</script>
 		<?php
@@ -70,7 +68,6 @@ function dazzle_bulk_admin_footer() {
 
 // Add WorldShip Bulk Export Addresses to the orders dropdown
 add_action('admin_footer-edit.php', 'worldship_bulk_admin_footer');
-// insert it in the dropdown
 function worldship_bulk_admin_footer() {
 
 	global $post_type;
@@ -122,18 +119,18 @@ function dazzle_worldship_address_export() {
 				foreach( $order_ids as $order_id ) {
 					$order = new WC_Order( $order_id );
 					$addressdata[] = array(
-						"FirstName" => strtoupper($order->shipping_first_name),
-						"LastName" => strtoupper($order->shipping_last_name),
-						"Company" => $order->shipping_company,
-						"Address1" => preg_replace('[\.]', NULL, $order->shipping_address_1),
-						"Address2" => $order->shipping_address_2,
-						"Address3" => $order->shipping_address_3,
-						"City" => $order->shipping_city,
-						"State" => $order->shipping_state,
-						"PostalCode" => $order->shipping_postcode,
-						"Country" => $order->shipping_country,
-						"Phone" => $order->billing_phone,
-						// "EMail" => $order->billing_email,  Depending on your shipping situation you may want e-mails disabled for DAZzle
+						"FirstName" => strtoupper($order->get_shipping_first_name()),
+						"LastName" => strtoupper($order->get_shipping_last_name()),
+						"Company" => $order->get_shipping_company(),
+						"Address1" => preg_replace('[\.]', NULL, $order->get_shipping_address_1()),
+						"Address2" => $order->get_shipping_address_2(),
+						"Address3" => '',
+						"City" => $order->get_shipping_city(),
+						"State" => $order->get_shipping_state(),
+						"PostalCode" => $order->get_shipping_postcode(),
+						"Country" => $order->get_shipping_country(),
+						"Phone" => $order->get_billing_phone(),
+						// "EMail" => $order->get_billing_email(),  Depending on your shipping situation you may want e-mails disabled for DAZzle
 						/* The following items need to be present, but can be left empty. */
 						"ReturnCode" => "",
 						"CarrierRoute" => "",
@@ -150,25 +147,25 @@ function dazzle_worldship_address_export() {
 				  	$name_company_array = format_worldship_name($order); // Company needs to go first if present -- if NOT present we need to use Name
 					$addressdata[] = array(
 						"CompanyOrName" => $name_company_array[0],
-					  	"Attention" => $name_company_array[1],
-						"Address1" => preg_replace('[\.]', NULL, $order->shipping_address_1),
-						"Address2" => $order->shipping_address_2,
-						"Address3" => $order->shipping_address_3,
-						"City" => $order->shipping_city,
-						"State" => $order->shipping_state,
-						"PostalCode" => $order->shipping_postcode,
-						"Country" => $order->shipping_country,
-						"Phone" => $order->billing_phone,
-						"EMail" => $order->billing_email,
+					  	"Attention" => (isset($name_company_array[1])) ? $name_company_array[1] : null,
+						"Address1" => preg_replace('[\.]', NULL, $order->get_shipping_address_1()),
+						"Address2" => $order->get_shipping_address_2(),
+						"Address3" => '',
+						"City" => $order->get_shipping_city(),
+						"State" => $order->get_shipping_state(),
+						"PostalCode" => $order->get_shipping_postcode(),
+						"Country" => $order->get_shipping_country(),
+						"Phone" => $order->get_billing_phone(),
+						"EMail" => $order->get_billing_email(),
 					);
 				}
 				break;
 		}
 	  	// Create a file using the array we just generated.
 		$out = fopen("php://output", 'w');
-
 		$flag = false;
 	  	$row_id=1;
+	  
 		foreach($addressdata as $row) {
 			if(!$flag) {
 				// display field/column names as first row
@@ -179,30 +176,41 @@ function dazzle_worldship_address_export() {
 			fputcsv($out, array_values($row), chr($delimiter), '"');
 		}
 		// Send the newly created file to the user.
-		fclose($out);
-
 		// Force the download
 		header('Content-Disposition: attachment; filename="ADDRESSES.'.$ext.'" . basename($out) . ""');
-		header("Content-Length: " . filesize($out));
 		header("Content-Type: application/octet-stream;");
+	  	//header($contenttypestr);
 		header("Pragma: no-cache");
 		header("Expires: 0");
 		header("Cache-Control: must-revalidate");
-		readfile($out);
+		fread($out, 1000000); // Limited to 1 megabyte
+	  	fclose($out);
 	  	die();
 	}
 }
 
 function format_worldship_name($order) {
   	$ret = array();
-	$formatted_name = strtoupper($order->shipping_first_name . ' ' . $order->shipping_last_name);
+	$formatted_name = strtoupper($order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name());
   
-  	if (empty($order->shipping_company)) {
+  	if (empty($order->get_shipping_company())) {
 		$ret[0] = $formatted_name;
 	  	$ret[1] = '';
 	} else {
-	  	$ret[0] = strtoupper($order->shipping_company);
+	  	$ret[0] = strtoupper($order->get_shipping_company());
 	  	$ret[1] = $formatted_name;
 	}
   	return $ret;
+}
+
+
+add_action('admin_notices', 'custom_bulk_admin_notices');
+ 
+function custom_bulk_admin_notices() {
+ 
+  global $post_type, $pagenow;
+
+  if($pagenow == 'edit.php' && $post_type == 'shop_order'){
+    echo "<div class=\"updated\"><p>keep the hands clappin'</p></div>";
+  }
 }

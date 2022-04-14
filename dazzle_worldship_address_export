@@ -202,15 +202,3 @@ function format_worldship_name($order) {
 	}
   	return $ret;
 }
-
-
-add_action('admin_notices', 'custom_bulk_admin_notices');
- 
-function custom_bulk_admin_notices() {
- 
-  global $post_type, $pagenow;
-
-  if($pagenow == 'edit.php' && $post_type == 'shop_order'){
-    echo "<div class=\"updated\"><p>keep the hands clappin'</p></div>";
-  }
-}

@@ -1,5 +1,5 @@
 /*
-* V 2.0.1
+* V 2.0.2
 * Use this to mark orders as complete in bulk by exporting your postage log
 * Be sure to put the WooCommerce order number into the Reference ID box when printing each label
 * Put this in a code snippet or into functions.php
@@ -16,8 +16,12 @@
 * - Quirks with DAZzle mean it will only upload to WooCommerce the MOST RECENTLY PRINTED tracking number
 * - WorldShip multiple tracking numbers are already supported
 *
-* Version 2.0.0:
-* - Allows for similar import from UPS WorldShip.
+*
+*	Version 2.0.2:
+*	- Fixed a bug where combination orders with multiple boxes would have the tracking numbers doubled
+*
+*	Version 2.0.0:
+*	- Allows for similar import from UPS WorldShip.
 */
 
 // ################
@@ -101,7 +105,7 @@ function dazzle_ws_import_menu_link_callback() {
 		  	*	Feel free to change this number depending on the nature of your e-commerce site.
 		  	*	Default is 4194304, or 4 MB.
 		  	*/
-			$errors[]='File size must be less than 2 MB.';
+			$errors[]='File size must be less than 4 MB.';
 		}
 
 		if(empty($errors)==true){
@@ -206,12 +210,12 @@ function dazzle_ws_import_menu_link_callback() {
 						$temp_valid_box_tracking_array = array();
 
 					  	if ($shipment->VoidIndicator == 'Y') {
-							continue;  // Exclude voided shipments
+							continue 1;  // Exclude voided shipments
 						}
 					  	foreach ($shipment->Packages->Package as $package)
 						{
 							if ($package->VoidIndicator == 'Y') {
-								continue;  // Exclude voided boxes
+								continue 1;  // Exclude voided boxes
 							}
 							foreach ($package->ReferenceNumbers->children() as $reference)
 							{
@@ -225,7 +229,9 @@ function dazzle_ws_import_menu_link_callback() {
 										  	// echo 'Putting Order ID in Array: '. $order_id . '<br />';
 											array_push($temp_valid_order_id_array, $order_id);
 										}
-										array_push($temp_valid_box_tracking_array, $package->TrackingNumber);
+										if (!in_array($package->TrackingNumber, $temp_valid_box_tracking_array)) { // This one needed in case of a multi-box combination order (multiple order IDs)
+											array_push($temp_valid_box_tracking_array, $package->TrackingNumber);
+										}
 									  	$count += 1;
 									}
 								}
@@ -267,11 +273,11 @@ function dazzle_ws_import_menu_link_callback() {
 					break;
 			}
 		  
-			echo '<ul>
-				<li>File size: ' . $_FILES[upload][size] . '</li>
-				<li>File type: ' . $_FILES[upload][type] . '</li>
+			echo "<ul>
+				<li>File size: " . $_FILES['upload']['size'] . "</li>
+				<li>File type: " . $_FILES['upload']['type'] . "</li>
 			</ul>
-			<br />Number of Box Labels Processed:  ' , $count;
+			<br />Number of Box Labels Processed:  " , $count;
 		  	echo '<br />Number of Orders Marked Complete:  ', $completed_count;
 		}else{
 			print_r($errors);

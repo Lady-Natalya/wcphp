@@ -1,5 +1,5 @@
 /*
-* V 2.0.2
+* V 2.1.0
 * Use this to mark orders as complete in bulk by exporting your postage log
 * Be sure to put the WooCommerce order number into the Reference ID box when printing each label
 * Put this in a code snippet or into functions.php
@@ -16,6 +16,8 @@
 * - Quirks with DAZzle mean it will only upload to WooCommerce the MOST RECENTLY PRINTED tracking number
 * - WorldShip multiple tracking numbers are already supported
 *
+*	Version 2.1.0:
+*	- Added support for UPS orders with multiple boxes spread across multiple shipments
 *
 *	Version 2.0.2:
 *	- Fixed a bug where combination orders with multiple boxes would have the tracking numbers doubled
@@ -122,7 +124,7 @@ function dazzle_ws_import_menu_link_callback() {
 		  	$completed_count = 0;
 
 		  	switch ($file_type) {
-				case 0: // TXT file from DAZzle
+				case 0: // TXT file from USPS Endicia DAZzle
 					$sanitized_str = sanitize_file($str);
 					
 					/*
@@ -201,72 +203,67 @@ function dazzle_ws_import_menu_link_callback() {
 						}
 					}	    
 					break;
-				case 1: // XML file from WorldShip
+				case 1: // XML file from UPS WorldShip
 					$xml = simplexml_load_string($str);
+					$array_of_all_orders_tracking = array();
+
 					foreach ($xml->Shipment as $shipment)
 					{
 						// Each shipment may contain multiple boxes, and each box may contain multiple Order IDs
-						$temp_valid_order_id_array = array();
-						$temp_valid_box_tracking_array = array();
-
-					  	if ($shipment->VoidIndicator == 'Y') {
+						// Multiple shipments may have been for the same order
+						if ($shipment->VoidIndicator == 'Y') {
 							continue 1;  // Exclude voided shipments
 						}
-					  	foreach ($shipment->Packages->Package as $package)
+						foreach ($shipment->Packages->Package as $package)
 						{
 							if ($package->VoidIndicator == 'Y') {
 								continue 1;  // Exclude voided boxes
 							}
-							foreach ($package->ReferenceNumbers->children() as $reference)
+						  	foreach ($package->ReferenceNumbers->children() as $reference)
 							{
 								$arr_order = check_ref_id_for_order_numbers($reference);
 								foreach ($arr_order as $order_id)
 								{
 									if (validate_order_id($order_id))
 									{
-									  	// echo 'Checking to see if we should put Order ID in Array: '. $order_id . '<br />';
-										if (!in_array($order_id, $temp_valid_order_id_array)) {
-										  	// echo 'Putting Order ID in Array: '. $order_id . '<br />';
-											array_push($temp_valid_order_id_array, $order_id);
+										if (!array_key_exists($order_id, $array_of_all_orders_tracking)) {
+											$array_of_all_orders_tracking[$order_id] = array();
 										}
-										if (!in_array($package->TrackingNumber, $temp_valid_box_tracking_array)) { // This one needed in case of a multi-box combination order (multiple order IDs)
-											array_push($temp_valid_box_tracking_array, $package->TrackingNumber);
-										}
-									  	$count += 1;
+										array_push($array_of_all_orders_tracking[$order_id], (string)$package->TrackingNumber);
 									}
 								}
 							}
 						}
-					  	if((!empty($temp_valid_box_tracking_array)) && (!empty($temp_valid_order_id_array))){
-							foreach($temp_valid_order_id_array as $order_id) {
-							  	$tracking_str = '';
-							  	$tracking_link_str = '';
-								foreach($temp_valid_box_tracking_array as $tracking_number) {
-								  	$tracking_link = format_ups_link($tracking_number);
-								  	if (empty($tracking_str)) {
-										$tracking_str = $tracking_number;
-										$tracking_link_str = $tracking_link;
-									} else {
-										$tracking_str = $tracking_str . ' + ' . $tracking_number;
-									  	$tracking_link_str = $tracking_link_str . ' + ' . $tracking_link;
-									}
-								}
-							  	if (validate_order_id($order_id) && ($order = wc_get_order($order_id)))
-								{
-								  	$link = format_order_link($order_id);
-									update_post_meta($order_id, 'ups_tracking_number', (string)$tracking_str);
-								  	$status = $order->get_status();
-									if (($status == 'completed') || ($status == 'refunded')) {
-										echo '<span class="tracking bg-completed">Order #' . $link . ' has had its UPS tracking set to ' . $tracking_link_str . ' and had already been marked as ' , strtoupper($status) , '</span><br />';
-									} else {
-										$order->set_status('completed');
-										$order->save();
-										echo '<span class="tracking">Order #' . $link . ' has had its UPS tracking set to ' . $tracking_link_str . ' and has had its status changed to: COMPLETED</span><br />';
-										$completed_count += 1;
-									}
-								} else echo '<span class="tracking bg-error">Order #' , $order_id , ' DOES NOT EXIST</span><br />';
+					}
+					foreach($array_of_all_orders_tracking as $order_id => $tracking_info) {
+						$tracking_str = '';
+						$tracking_link_str = '';
+						foreach($tracking_info as $tracking_number) {
+							$tracking_link = format_ups_link($tracking_number);
+							if (empty($tracking_str)) {
+								$tracking_str = $tracking_number;
+								$tracking_link_str = $tracking_link;
+							} else {
+								$tracking_str = $tracking_str . ' + ' . $tracking_number;
+								$tracking_link_str = $tracking_link_str . ' + ' . $tracking_link;
 							}
 						}
+					  	
+						if (validate_order_id($order_id) && ($order = wc_get_order($order_id)))
+						{
+							$link = format_order_link($order_id);
+							update_post_meta($order_id, 'ups_tracking_number', (string)$tracking_str);
+							
+							$status = $order->get_status();
+							if (($status == 'completed') || ($status == 'refunded')) {
+								echo '<span class="tracking bg-completed">Order #' . $link . ' has had its UPS tracking set to ' . $tracking_link_str . ' and had already been marked as ' , strtoupper($status) , '</span><br />';
+							} else {
+								$order->set_status('completed');
+								$order->save();
+								echo '<span class="tracking">Order #' . $link . ' has had its UPS tracking set to ' . $tracking_link_str . ' and has had its status changed to: COMPLETED</span><br />';
+								$completed_count += 1;
+							}
+						} else echo '<span class="tracking bg-error">Order #' , $order_id , ' DOES NOT EXIST</span><br />';
 					}
 					break;
 				default: // There may have been an error.

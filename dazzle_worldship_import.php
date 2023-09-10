@@ -1,5 +1,5 @@
 /*
-* V 2.1.0
+* V 2.1.1
 * Use this to mark orders as complete in bulk by exporting your postage log
 * Be sure to put the WooCommerce order number into the Reference ID box when printing each label
 * Put this in a code snippet or into functions.php
@@ -15,6 +15,9 @@
 * - Example:  96652 + 95563
 * - Quirks with DAZzle mean it will only upload to WooCommerce the MOST RECENTLY PRINTED tracking number
 * - WorldShip multiple tracking numbers are already supported
+*
+*	Version 2.1.1:
+*	- Allow user to immediately upload another file after an upload.
 *
 *	Version 2.1.0:
 *	- Added support for UPS orders with multiple boxes spread across multiple shipments
@@ -69,7 +72,7 @@ function dazzle_ws_import_menu_link_callback() {
 			color:#000;
 			margin:0.5rem;
 			padding:0.5rem;
-			width:100%;
+			width:-moz-available;
 		}
 	  	.tracking {
 			padding: 0 0.125rem;
@@ -121,6 +124,7 @@ function dazzle_ws_import_menu_link_callback() {
 		  	
 			$str = file_get_contents($_FILES['upload']['tmp_name']);
 			$count = 0;
+			$proccessed_type_str = "Box Labels";
 		  	$completed_count = 0;
 
 		  	switch ($file_type) {
@@ -206,11 +210,14 @@ function dazzle_ws_import_menu_link_callback() {
 				case 1: // XML file from UPS WorldShip
 					$xml = simplexml_load_string($str);
 					$array_of_all_orders_tracking = array();
+					$proccessed_type_str = "Shipments";
 
 					foreach ($xml->Shipment as $shipment)
 					{
 						// Each shipment may contain multiple boxes, and each box may contain multiple Order IDs
 						// Multiple shipments may have been for the same order
+						$count += 1;
+
 						if ($shipment->VoidIndicator == 'Y') {
 							continue 1;  // Exclude voided shipments
 						}
@@ -274,20 +281,28 @@ function dazzle_ws_import_menu_link_callback() {
 				<li>File size: " . $_FILES['upload']['size'] . "</li>
 				<li>File type: " . $_FILES['upload']['type'] . "</li>
 			</ul>
-			<br />Number of Box Labels Processed:  " , $count;
+			<br />Number of " . $proccessed_type_str . " Processed:  " , $count;
 		  	echo '<br />Number of Orders Marked Complete:  ', $completed_count;
+			?>
+			<br /><br />
+			<hr />
+			Upload another USPS Endicia DAZzle .txt file or a UPS WorldShip .xml file:<br /><br />
+			<form action="" method="POST" enctype="multipart/form-data">
+				<input type="file" name="upload" \>
+				<input type="submit" value="Upload" \>
+			</form>
+			<?php
 		}else{
 			print_r($errors);
 		}
 	}
 	else
-	{
-		// Looks like a file has not been uploaded yet.  This will display the file upload box.
-		echo 'Use this tool to import a USPS Endicia DAZzle .txt file or a UPS WorldShip .xml file of exported printed labels to import into WooCommerce and update the orders.<br /><br />
+	{		
+		?>Use this tool to import a USPS Endicia DAZzle .txt file or a UPS WorldShip .xml file of exported printed labels to import into WooCommerce and update the orders.<br /><br />
 		<form action="" method="POST" enctype="multipart/form-data">
 			<input type="file" name="upload" \>
 			<input type="submit" value="Upload" \>
-		</form>';
+		</form><?php
 	}
 	echo '</div>';
 }

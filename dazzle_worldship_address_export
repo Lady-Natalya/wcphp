@@ -1,5 +1,8 @@
 /* WooCommerce DAZzle and WorldShip Address Export script
-*  Version 2.0.1
+*  Version 2.1.0
+*
+*  2.1.0 Update:
+*  DAZzle now crashes when importing addresses from a .txt file, so now we export a .xml file instead.
 *
 *  Export lots of addresses from WooCommerce orders into a .txt file DAZzle can use to import addresses quickly
 *  As of 2.0.0 addresses can also be exported as a .csv for UPS WorldShip
@@ -112,6 +115,10 @@ function dazzle_worldship_address_export() {
 		$addressdata = array();
 	  	$delimiter = 44;  // Defaulting to Comma -- DAZzle uses TAB, WorldShip uses Comma
 	  	$ext = 'csv';  // Defaulting to csv -- DAZzle used txt, WorldShip uses csv
+	
+		// Setup file output
+		$out = fopen("php://output", 'w');
+	  	$row_id=1;
 	  
 		switch($action) {
 			case 'dazzleexport':
@@ -119,9 +126,9 @@ function dazzle_worldship_address_export() {
 				foreach( $order_ids as $order_id ) {
 					$order = new WC_Order( $order_id );
 					$addressdata[] = array(
-						"FirstName" => strtoupper($order->get_shipping_first_name()),
-						"LastName" => strtoupper($order->get_shipping_last_name()),
-						"Company" => $order->get_shipping_company(),
+						"FirstName" => str_replace("'", '', strtoupper($order->get_shipping_first_name())),
+						"LastName" => str_replace("'", '', strtoupper($order->get_shipping_last_name())),
+						"Company" => str_replace("'", '', $order->get_shipping_company()),
 						"Address1" => preg_replace('[\.]', NULL, $order->get_shipping_address_1()),
 						"Address2" => $order->get_shipping_address_2(),
 						"Address3" => '',
@@ -129,16 +136,41 @@ function dazzle_worldship_address_export() {
 						"State" => $order->get_shipping_state(),
 						"PostalCode" => $order->get_shipping_postcode(),
 						"Country" => $order->get_shipping_country(),
-						"Phone" => $order->get_billing_phone(),
+						"Phone" => $order->get_billing_phone()//,
 						// "EMail" => $order->get_billing_email(),  Depending on your shipping situation you may want e-mails disabled for DAZzle
 						/* The following items need to be present, but can be left empty. */
-						"ReturnCode" => "",
+						/*"ReturnCode" => "",
 						"CarrierRoute" => "",
-						"DeliveryPoint" => ""
+						"DeliveryPoint" => ""*/
 					);
 				}
+				/*
 				$delimiter = 9; // DAZzle needs to use TAB
 				$ext = 'txt'; // DAZzle needs to use txt
+				*/
+				// July 2023 -- DAZzle now crashes when importing a .txt file.
+				// Going forward this will export a .xml file instead.
+				$ext = 'xml';
+				$dazzle_xml_str = "<DAZzle>\r\n";
+				$dazzle_xml_address_id = 0;
+				foreach($addressdata as $row) {
+					$dazzle_xml_address_id += 1;  // First one needs to be 1, so initialized at 0
+					$dazzle_xml_str .= '<Package ID="' . $dazzle_xml_address_id . '">' . "\r\n";
+					$dazzle_xml_str .= "<ToFirstName>" . $row["FirstName"] . "</ToFirstName>\r\n";
+					$dazzle_xml_str .= "<ToLastName>" . $row["LastName"] . "</ToLastName>\r\n";
+					$dazzle_xml_str .= "<ToName>" . $row["FirstName"] . " " . $row["LastName"] . "</ToName>\r\n"; // DAZzle needs this to display properly
+					$dazzle_xml_str .= "<ToCompany>" . $row["Company"] . "</ToCompany>\r\n";
+					$dazzle_xml_str .= "<ToAddress1>" . $row["Address1"] . "</ToAddress1>\r\n";
+					$dazzle_xml_str .= "<ToAddress2>" . $row["Address2"] . "</ToAddress2>\r\n";
+					$dazzle_xml_str .= "<ToCity>" . $row["City"] . "</ToCity>\r\n";
+					$dazzle_xml_str .= "<ToState>" . $row["State"] . "</ToState>\r\n";
+					$dazzle_xml_str .= "<ToPostalCode>" . $row["PostalCode"] . "</ToPostalCode>\r\n";
+					$dazzle_xml_str .= "<ToCountry>" . $row["Country"] . "</ToCountry>\r\n";
+					$dazzle_xml_str .= "<ToPhone>" . $row["Phone"] . "</ToPhone>\r\n";
+					$dazzle_xml_str .= "<ToReturnCode></ReturnCode>\r\n<ToCarrierRoute></ToCarrierRoute>\r\n<ToDeliveryPoint></ToDeliveryPoint>\r\n</Package>\r\n";
+				}
+				$dazzle_xml_str .= '</DAZzle>';
+				fwrite($out, $dazzle_xml_str);
 				break;
 			case 'worldshipexport':
 				// Write addresses from each selected order to $addressdata array
@@ -159,22 +191,24 @@ function dazzle_worldship_address_export() {
 						"EMail" => $order->get_billing_email(),
 					);
 				}
+				// Output that array as a file
+				$flag = false;
+				
+				foreach($addressdata as $row) {
+					if(!$flag) {
+						// display field/column names as first row
+						fputcsv($out, array_keys($row), chr($delimiter), '"');	
+						$flag = true;
+					}
+					array_walk($row, __NAMESPACE__ . '\cleanData');
+					fputcsv($out, array_values($row), chr($delimiter), '"');
+				}
 				break;
 		}
 	  	// Create a file using the array we just generated.
-		$out = fopen("php://output", 'w');
-		$flag = false;
-	  	$row_id=1;
+		
 	  
-		foreach($addressdata as $row) {
-			if(!$flag) {
-				// display field/column names as first row
-				fputcsv($out, array_keys($row), chr($delimiter), '"');	
-				$flag = true;
-			}
-			array_walk($row, __NAMESPACE__ . '\cleanData');
-			fputcsv($out, array_values($row), chr($delimiter), '"');
-		}
+		
 		// Send the newly created file to the user.
 		// Force the download
 		header('Content-Disposition: attachment; filename="ADDRESSES.'.$ext.'" . basename($out) . ""');
